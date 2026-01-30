@@ -1,0 +1,52 @@
+cmake_minimum_required(VERSION 3.20)
+
+project(TinyInfer
+    VERSION 0.1.0
+    LANGUAGES CXX
+)
+
+if (MSVC)
+  add_compile_options(/utf-8)
+endif()
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+include(FetchContent)
+
+option(BUILD_TESTING "Build the testing tree." ON)
+
+add_subdirectory(src)
+add_subdirectory(examples)
+
+if(BUILD_TESTING)
+    include(CTest)
+    enable_testing()
+
+    # ---------- GoogleTest ----------
+    FetchContent_Declare(
+      googletest
+      URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+    )
+    # MSVC 下避免 gtest 覆盖你的运行库选项（很重要）
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    # 如果你有 tests/ 目录，就加上这一句
+    add_subdirectory(tests)
+
+    # ---------- Google Benchmark ----------
+    FetchContent_Declare(
+      googlebenchmark
+      URL https://github.com/google/benchmark/archive/refs/tags/v1.8.3.zip
+    )
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googlebenchmark)
+
+    add_subdirectory(benchmarks)
+endif()
