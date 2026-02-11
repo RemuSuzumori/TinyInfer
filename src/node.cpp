@@ -2,6 +2,7 @@
 #include <random>
 #include <algorithm>
 #include <immintrin.h> // SIMD
+#include <fstream>
 
 namespace tiny_infer {
 
@@ -54,6 +55,33 @@ Tensor Linear::forward(const Tensor& input) {
     return output;
 }
 
+void Linear::load_params(const std::string& w_path, const std::string& b_path) {
+    auto load_bin = [](const std::string& path, Tensor& t) {
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (!file) throw std::runtime_error("Cannot open file: " + path);
+        
+        std::streamsize size = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        size_t expected_bytes = t.shape()[0] * t.shape()[1]; 
+        // 这里的 shape[0] 是 In 还是 Out 取决于 Tensor 构造时的顺序，
+        // 但不管顺序，总大小 (rows*cols) 必须匹配文件字节数
+        if (t.shape().size() == 1) expected_bytes = t.shape()[0]; // Bias 情况
+        
+        expected_bytes *= sizeof(float);
+
+        if (size != expected_bytes) {
+            throw std::runtime_error("File size mismatch for " + path);
+        }
+
+        if (!file.read(reinterpret_cast<char*>(t.data()), size)) {
+            throw std::runtime_error("Read error");
+        }
+    };
+
+    load_bin(w_path, m_weights);
+    load_bin(b_path, m_bias);
+}
 // --- ReLU 实现 (SIMD 优化版) ---
 
 Tensor ReLU::forward(const Tensor& input) {

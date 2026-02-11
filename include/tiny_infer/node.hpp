@@ -1,6 +1,7 @@
 #pragma once
 #include "tiny_infer/tensor.hpp"
 #include <vector>
+
 #include <memory>
 #include <string>
 
@@ -32,6 +33,8 @@ public:
     // 获取权重（用于加载模型参数）
     Tensor& weights() { return m_weights; }
     Tensor& bias() { return m_bias; }
+    // 加载二进制权重文件
+    void load_params(const std::string& w_path, const std::string& b_path);
 
 private:
     Tensor m_weights; // 形状 [out_features, in_features]

@@ -24,6 +24,57 @@ option(BUILD_TESTING "Build the testing tree." ON)
 add_subdirectory(src)
 add_subdirectory(examples)
 
+# ============================================================
+# 🔒 永久锁死 Python（必须放在 pybind11 之前！）
+#   目的：避免 pybind11 去 PATH 找到 MSYS2/conda 的 python
+# ============================================================
+
+# 1) 这里填你“唯一允许”的 Python 根目录 & python.exe
+#    ✅ 按你之前日志：python312.lib 在 .../libs/python312.lib
+set(TINYINFER_PYTHON_ROOT "E:/python" CACHE PATH "Fixed Python root for TinyInfer")
+set(TINYINFER_PYTHON_EXE  "${TINYINFER_PYTHON_ROOT}/python.exe"              CACHE FILEPATH "Fixed Python executable for TinyInfer")
+
+# 2) 强制 CMake 的 Python3 查找策略：只走你给的路径，不翻注册表/venv
+set(Python3_ROOT_DIR "${TINYINFER_PYTHON_ROOT}" CACHE PATH "" FORCE)
+set(Python3_EXECUTABLE "${TINYINFER_PYTHON_EXE}" CACHE FILEPATH "" FORCE)
+set(Python3_FIND_STRATEGY LOCATION CACHE STRING "" FORCE)
+set(Python3_FIND_REGISTRY NEVER CACHE STRING "" FORCE)
+set(Python3_FIND_VIRTUALENV NEVER CACHE STRING "" FORCE)
+
+# 3) 找到 Interpreter + Development（会给出 include + pythonXX.lib）
+#    这一句会生成：
+#      Python3_EXECUTABLE, Python3_INCLUDE_DIRS, Python3_LIBRARIES
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+message(STATUS "=== Fixed Python for TinyInfer ===")
+message(STATUS "Python3_EXECUTABLE   = ${Python3_EXECUTABLE}")
+message(STATUS "Python3_INCLUDE_DIRS = ${Python3_INCLUDE_DIRS}")
+message(STATUS "Python3_LIBRARIES    = ${Python3_LIBRARIES}")
+
+# 4) 兼容 pybind11(2.11.1) 旧的 FindPythonLibsNew：回填旧变量
+#    这样 pybind11 就算走旧逻辑，也会直接拿到你指定的库/头
+set(PYTHON_EXECUTABLE "${Python3_EXECUTABLE}" CACHE FILEPATH "" FORCE)
+
+# Python3_INCLUDE_DIRS / Python3_LIBRARIES 可能是 list，取第一个最稳
+list(GET Python3_INCLUDE_DIRS 0 _py_inc0)
+set(PYTHON_INCLUDE_DIR "${_py_inc0}" CACHE PATH "" FORCE)
+
+list(GET Python3_LIBRARIES 0 _py_lib0)
+set(PYTHON_LIBRARY "${_py_lib0}" CACHE FILEPATH "" FORCE)
+
+# ============================================================
+# --- 1. 下载并配置 pybind11（放在 Python 锁死之后） ---
+# ============================================================
+
+FetchContent_Declare(
+  pybind11
+  URL https://github.com/pybind/pybind11/archive/refs/tags/v2.11.1.zip
+)
+FetchContent_MakeAvailable(pybind11)
+
+# --- 2. 添加存放 Python 绑定代码的文件夹 ---
+add_subdirectory(python)
+
 if(BUILD_TESTING)
     include(CTest)
     enable_testing()
@@ -37,7 +88,6 @@ if(BUILD_TESTING)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
 
-    # 如果你有 tests/ 目录，就加上这一句
     add_subdirectory(tests)
 
     # ---------- Google Benchmark ----------
