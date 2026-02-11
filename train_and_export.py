@@ -37,14 +37,15 @@ def train():
 
     # 只训练 1 个 Epoch，足够在简单的 MLP 上达到 90%+ 准确率
     model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        optimizer.zero_grad()
-        output = model(data)
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % 200 == 0:
-            print(f"训练进度: [{batch_idx * len(data)}/60000]  Loss: {loss.item():.6f}")
+    for epoch in range(1, 6): # 训练 5 个 Epoch
+        print(f"\n--- 开始第 {epoch} 轮训练 ---")
+        for batch_idx, (data, target) in enumerate(train_loader):
+            optimizer.zero_grad()
+            loss = criterion(model(data), target)
+            loss.backward()
+            optimizer.step()
+            if batch_idx % 400 == 0:
+                print(f"进度: [{batch_idx * 64}/60000] Loss: {loss.item():.4f}")
 
     print(">>> 训练完成！开始导出权重...")
     
@@ -53,12 +54,12 @@ def train():
     print(">>> 训练完成！开始导出权重 (已执行转置适配 C++ 引擎)...")
     os.makedirs("models", exist_ok=True)
     
-    # 导出 FC1 (移除 .T.copy()，直接导出 PyTorch 的原始形状 [Out, In])
-    model.fc1.weight.detach().numpy().tofile("models/fc1_weights.bin")
+# 位于 train_and_export.py 结尾
+    # 导出时务必转置，以匹配 C++ [In, Out] 的预期形状
+    model.fc1.weight.detach().numpy().T.copy().tofile("models/fc1_weights.bin")
     model.fc1.bias.detach().numpy().tofile("models/fc1_bias.bin")
     
-    # 导出 FC2 (同理)
-    model.fc2.weight.detach().numpy().tofile("models/fc2_weights.bin")
+    model.fc2.weight.detach().numpy().T.copy().tofile("models/fc2_weights.bin")
     model.fc2.bias.detach().numpy().tofile("models/fc2_bias.bin")
     
     print("✅ 真实权重已保存至 models/ 目录。")

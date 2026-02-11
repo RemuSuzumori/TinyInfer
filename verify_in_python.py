@@ -22,21 +22,26 @@ def verify():
     model = TinyNet()
     
     # 2. 手动加载和你 C++ 一模一样的 .bin 权重
-    # 注意：PyTorch 的 Linear 权重形状是 (Out, In)，我们需要确保 numpy 读取后形状匹配
+    # 【核心修改区】
+    # 因为磁盘上的 .bin 文件已经被我们统一改成了 [In, Out] 格式
+    # 所以我们先按 [In, Out] 读取，然后用 .T 翻转回 PyTorch 想要的 [Out, In] 格式
     try:
-        fc1_w = np.fromfile("models/fc1_weights.bin", dtype=np.float32).reshape(128, 784)
+        # FC1 磁盘是 [784, 128]，读取后转置给 PyTorch [128, 784]
+        fc1_w = np.fromfile("models/fc1_weights.bin", dtype=np.float32).reshape(784, 128).T
         fc1_b = np.fromfile("models/fc1_bias.bin", dtype=np.float32)
-        fc2_w = np.fromfile("models/fc2_weights.bin", dtype=np.float32).reshape(10, 128)
+        
+        # FC2 磁盘是 [128, 10]，读取后转置给 PyTorch [10, 128]
+        fc2_w = np.fromfile("models/fc2_weights.bin", dtype=np.float32).reshape(128, 10).T
         fc2_b = np.fromfile("models/fc2_bias.bin", dtype=np.float32)
     except FileNotFoundError:
         print("❌ 找不到权重文件，请先运行 train_and_export.py")
         return
 
-    # 暴力赋值给 PyTorch 模型
+    # 暴力赋值给 PyTorch 模型 (使用 .copy() 保证内存连续性)
     with torch.no_grad():
-        model.fc1.weight.data = torch.from_numpy(fc1_w)
+        model.fc1.weight.data = torch.from_numpy(fc1_w.copy())
         model.fc1.bias.data = torch.from_numpy(fc1_b)
-        model.fc2.weight.data = torch.from_numpy(fc2_w)
+        model.fc2.weight.data = torch.from_numpy(fc2_w.copy())
         model.fc2.bias.data = torch.from_numpy(fc2_b)
     
     model.eval()
@@ -63,16 +68,6 @@ def verify():
         print(f"[{i}]: {p:.4f}", end="  ")
         if i == 4: print() # 换行
     print("\n")
-
-    # --- 诊断建议 ---
-    if pred == 7:
-        print("💡 结论: 你的 C++ 引擎是完美的！问题出在【图片】。")
-        print("原因: MLP 模型对位置太敏感，你的手写数字可能偏离了重心，或者笔画特征不像训练集。")
-        print("建议: 使用下面的 process_image_advanced.py 代码加入【重心对齐】功能。")
-    elif pred == 4:
-        print("💡 结论: 图片没问题，是【C++ 引擎权重加载】反了！")
-        print("原因: PyTorch 权重是 (Out, In)，C++ 可能按 (In, Out) 读取了。")
-        print("建议: 在导出脚本中加入 .T (转置) 操作。")
 
 if __name__ == "__main__":
     verify()

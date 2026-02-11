@@ -9,7 +9,7 @@ namespace tiny_infer {
 // --- Linear 实现 ---
 
 Linear::Linear(size_t in_features, size_t out_features) 
-    : m_weights({out_features, in_features}), 
+    : m_weights({in_features, out_features}), 
       m_bias({out_features})
 {
     // 初始化权重 (简单随机初始化，模拟 PyTorch xavier_uniform)
@@ -63,15 +63,14 @@ void Linear::load_params(const std::string& w_path, const std::string& b_path) {
         std::streamsize size = file.tellg();
         file.seekg(0, std::ios::beg);
 
-        // 安全计算总元素数量
+        // 使用循环累乘 shape，防止 1D Tensor 访问 shape()[1] 崩溃
         size_t total_elements = 1;
         for (auto s : t.shape()) total_elements *= s;
         size_t expected_bytes = total_elements * sizeof(float);
 
         if (size != (std::streamsize)expected_bytes) {
-            throw std::runtime_error("File size mismatch for " + path);
+            throw std::runtime_error("File size mismatch: " + path);
         }
-
         file.read(reinterpret_cast<char*>(t.data()), size);
     };
 
